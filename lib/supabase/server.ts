@@ -9,7 +9,7 @@ import { cookies } from "next/headers";
 export async function createClient() {
   const cookieStore = await cookies();
 
-  return createServerClient(
+  const client = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
@@ -31,4 +31,14 @@ export async function createClient() {
       },
     },
   );
+
+  // Debug logs para verificar el cliente
+  console.log('Supabase client created in server.ts');
+  console.log('Client methods available:', Object.getOwnPropertyNames(client));
+  console.log('Client.auth available:', !!client.auth);
+  console.log('Client.from available:', !!client.from);
+  console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+  console.log('Supabase Key present:', !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+
+  return client;
 }

@@ -1,110 +1,132 @@
-"use client";
+'use client';
 
-import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from './ui/Button';
+import { createClient } from '@/lib/supabase/client';
 
-export function LoginForm({
-  className,
-  ...props
-}: React.ComponentPropsWithoutRef<"div">) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+export function LoginForm() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
-    setIsLoading(true);
-    setError(null);
+    setLoading(true);
+    setError('');
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const supabase = createClient();
+
+      // 1. Autenticar usuario
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/protected");
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+
+      if (authError) throw authError;
+
+      // 2. Verificar rol del usuario (versión simplificada)
+      if (authData.user) {
+        console.log('User authenticated:', authData.user.email);
+
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', authData.user.id)
+            .single();
+
+          console.log('Profile data:', profile);
+          console.log('Profile error:', profileError);
+
+          if (!profileError && profile) {
+            console.log('User role:', profile.role);
+            // Redirigir según el rol
+            if (profile.role === 'admin' || profile.role === 'staff') {
+              console.log('Redirecting to admin dashboard...');
+              router.push('/admin');
+            } else {
+              console.log('Redirecting to protected page...');
+              router.push('/protected');
+            }
+          } else {
+            console.log('Profile not found, redirecting to protected...');
+            router.push('/protected');
+          }
+        } catch (error) {
+          console.error('Error checking profile:', error);
+          console.log('Redirecting to protected due to error...');
+          router.push('/protected');
+        }
+      }
+    } catch (error: any) {
+      setError(error.message || 'Ocurrió un error durante el inicio de sesión');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin}>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
-              </Button>
-            </div>
-            <div className="mt-4 text-center text-sm">
-              Don&apos;t have an account?{" "}
-              <Link
-                href="/auth/sign-up"
-                className="underline underline-offset-4"
-              >
-                Sign up
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+    <div className="w-full max-w-md mx-auto">
+      <form onSubmit={handleLogin} className="space-y-4">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-[#676960] mb-2">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full px-4 py-3 border border-[#b5b6ad] rounded-lg text-[#41423a] bg-white focus:ring-2 focus:ring-[#41423a] focus:border-[#41423a] outline-none transition-all placeholder-[#8e9087]"
+            placeholder="tu@email.com"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-[#676960] mb-2">
+            Contraseña
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full px-4 py-3 border border-[#b5b6ad] rounded-lg text-[#41423a] bg-white focus:ring-2 focus:ring-[#41423a] focus:border-[#41423a] outline-none transition-all placeholder-[#8e9087]"
+            placeholder="••••••••"
+          />
+        </div>
+
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-[#41423a] text-white hover:bg-[#1a1b14] disabled:bg-[#8e9087] font-semibold py-3"
+        >
+          {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+        </Button>
+      </form>
+
+      <div className="mt-6 text-center">
+        <p className="text-sm text-[#676960]">
+          ¿No tienes cuenta?{' '}
+          <a href="/auth/register" className="font-medium text-[#41423a] hover:text-[#1a1b14] underline">
+            Regístrate
+          </a>
+        </p>
+      </div>
     </div>
   );
 }
+
+export default LoginForm;

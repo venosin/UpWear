@@ -1,0 +1,89 @@
+# ============================================
+# Docker Compose para Desarrollo
+# Configuración optimizada para desarrollo local
+# ============================================
+
+version: '3.8'
+
+services:
+  # Aplicación Next.js en modo desarrollo
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: clothing-store-app-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/clothing_store_dev
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - clothing-store-network
+    command: npm run dev
+
+  # Base de datos para desarrollo
+  postgres:
+    image: postgres:15-alpine
+    container_name: clothing-store-db-dev
+    environment:
+      POSTGRES_DB: clothing_store_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - clothing-store-network
+
+  # Redis para desarrollo
+  redis:
+    image: redis:7-alpine
+    container_name: clothing-store-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    restart: unless-stopped
+    networks:
+      - clothing-store-network
+
+  # PgAdmin solo en desarrollo
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: clothing-store-pgadmin-dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: dev@clothingstore.com
+      PGADMIN_DEFAULT_PASSWORD: dev123
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - clothing-store-network
+
+# Volúmenes para desarrollo
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  pgadmin_dev_data:
+
+networks:
+  clothing-store-network:
+    driver: bridge

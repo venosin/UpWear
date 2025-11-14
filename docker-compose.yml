@@ -1,0 +1,127 @@
+# ============================================
+# Docker Compose para Tienda de Ropa
+# Incluye aplicación, base de datos local y Redis para caché
+# ============================================
+
+version: '3.8'
+
+services:
+  # Aplicación Next.js
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: clothing-store-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/clothing_store
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./public:/app/public:ro
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - clothing-store-network
+
+  # Base de datos PostgreSQL (desarrollo local)
+  postgres:
+    image: postgres:15-alpine
+    container_name: clothing-store-db
+    environment:
+      POSTGRES_DB: clothing_store
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init:/docker-entrypoint-initdb.d
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    restart: unless-stopped
+    networks:
+      - clothing-store-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis para caché y sesiones
+  redis:
+    image: redis:7-alpine
+    container_name: clothing-store-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass redis_password
+    restart: unless-stopped
+    networks:
+      - clothing-store-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Nginx para reverse proxy (producción)
+  nginx:
+    image: nginx:alpine
+    container_name: clothing-store-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./public:/var/www/public:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - clothing-store-network
+
+  # PgAdmin para gestión de base de datos (solo desarrollo)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: clothing-store-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@clothingstore.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./scripts/pgadmin-servers.json:/pgadmin4/servers.json
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - clothing-store-network
+    profiles:
+      - development
+
+# Volúmenes persistentes
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+# Red personalizada
+networks:
+  clothing-store-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

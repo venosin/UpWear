@@ -59,6 +59,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Log de depuración para admin routes
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    console.log("Admin route accessed:", request.nextUrl.pathname);
+    console.log("User:", user);
+  }
+
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
   // If you're creating a new response object with NextResponse.next() make sure to:
   // 1. Pass the request in it, like so:
