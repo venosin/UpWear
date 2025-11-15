@@ -1,11 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-/**
- * Especially important if using Fluid compute: Don't put this client in a
- * global variable. Always create a new client within each function when using
- * it.
- */
 export async function createClient() {
   const cookieStore = await cookies();
 
@@ -20,7 +15,7 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
+              cookieStore.set(name, value, options)
             );
           } catch {
             // The `setAll` method was called from a Server Component.
@@ -29,16 +24,8 @@ export async function createClient() {
           }
         },
       },
-    },
+    }
   );
-
-  // Debug logs para verificar el cliente
-  console.log('Supabase client created in server.ts');
-  console.log('Client methods available:', Object.getOwnPropertyNames(client));
-  console.log('Client.auth available:', !!client.auth);
-  console.log('Client.from available:', !!client.from);
-  console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-  console.log('Supabase Key present:', !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 
   return client;
 }

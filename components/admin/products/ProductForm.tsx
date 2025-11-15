@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../Card';
 import { Upload, X, Plus, Trash2, Save } from 'lucide-react';
 import Image from 'next/image';
+import { productService } from '@/services/productService';
 
 /**
  * Interfaz para información básica del producto
@@ -403,6 +404,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
   // Estado del formulario
   const [basicInfo, setBasicInfo] = useState<ProductBasicInfo>({
@@ -427,35 +429,59 @@ export function ProductForm({ initialData }: ProductFormProps) {
 
   const [images, setImages] = useState<ProductImage[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
-
   const [isUploading, setIsUploading] = useState(false);
 
-  // Datos de ejemplo (deberían venir de Supabase)
-  const availableSizes = [
-    { id: 1, name: 'XS' },
-    { id: 2, name: 'S' },
-    { id: 3, name: 'M' },
-    { id: 4, name: 'L' },
-    { id: 5, name: 'XL' },
-    { id: 6, name: 'XXL' }
-  ];
-
-  const availableColors = [
-    { id: 1, name: 'Negro', hex: '#000000' },
-    { id: 2, name: 'Blanco', hex: '#FFFFFF' },
-    { id: 3, name: 'Gris', hex: '#808080' },
-    { id: 4, name: 'Azul', hex: '#0000FF' },
-    { id: 5, name: 'Rojo', hex: '#FF0000' }
-  ];
-
-  const availableConditions = [
+  // Datos reales de la base de datos
+  const [availableCategories, setAvailableCategories] = useState<Array<{ id: number; name: string }>>([]);
+  const [availableBrands, setAvailableBrands] = useState<Array<{ id: number; name: string }>>([]);
+  const [availableSizes, setAvailableSizes] = useState<Array<{ id: number; name: string }>>([]);
+  const [availableColors, setAvailableColors] = useState<Array<{ id: number; name: string; hex: string }>>([]);
+  const [availableConditions] = useState<Array<{ id: number; name: string }>>([
     { id: 1, name: 'Nuevo' },
     { id: 2, name: 'Nuevo con etiquetas' },
     { id: 3, name: 'Casi nuevo' },
     { id: 4, name: 'Buen estado' }
-  ];
+  ]);
 
-  // Generar slug automáticamente desde el nombre
+  // Cargar datos desde Supabase
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+
+        console.log('🔄 Loading data from Supabase...');
+
+        const [categories, brands, sizes, colors] = await Promise.all([
+          productService.getCategories(),
+          productService.getBrands(),
+          productService.getSizes(),
+          productService.getColors()
+        ]);
+
+        setAvailableCategories(categories);
+        setAvailableBrands(brands);
+        setAvailableSizes(sizes);
+        setAvailableColors(colors);
+
+        console.log('✅ Data loaded successfully:', {
+          categories: categories.length,
+          brands: brands.length,
+          sizes: sizes.length,
+          colors: colors.length
+        });
+
+      } catch (error) {
+        console.error('❌ Error loading data:', error);
+        setErrors({ load: 'Error al cargar datos desde la base de datos' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Generar slug automáticamente desde el nombre y SKU
   const generateSlug = useCallback((name: string) => {
     return name
       .toLowerCase()
@@ -463,6 +489,15 @@ export function ProductForm({ initialData }: ProductFormProps) {
       .replace(/\s+/g, '-') // Replace spaces with -
       .replace(/-+/g, '-'); // Remove multiple hyphens
   }, []);
+
+  // Generar SKU automáticamente
+  const generateSKU = useCallback(() => {
+    if (basicInfo.categoryId && availableCategories.length > 0) {
+      const category = availableCategories.find(c => c.id === basicInfo.categoryId);
+      return productService.generateSKU(basicInfo.name, category?.name);
+    }
+    return productService.generateSKU(basicInfo.name);
+  }, [basicInfo.name, basicInfo.categoryId, availableCategories]);
 
   // Validar formulario
   const validateForm = (): boolean => {
@@ -481,6 +516,10 @@ export function ProductForm({ initialData }: ProductFormProps) {
       newErrors.description = 'La descripción es requerida';
     }
 
+    if (!basicInfo.slug.trim()) {
+      newErrors.slug = 'El slug URL es requerido';
+    }
+
     // Validar precios
     if (pricing.priceRegular <= 0) {
       newErrors.priceRegular = 'El precio regular debe ser mayor a 0';
@@ -490,10 +529,12 @@ export function ProductForm({ initialData }: ProductFormProps) {
       newErrors.priceSale = 'El precio de venta no puede ser negativo';
     }
 
-    // Validar que al menos una imagen esté configurada como principal
-    const hasMainImage = images.some(img => img.imageType === 'main');
-    if (!hasMainImage && images.length > 0) {
-      newErrors.images = 'Debes seleccionar una imagen principal';
+    // Validar que al menos una imagen esté configurada como principal (si hay imágenes)
+    if (images.length > 0) {
+      const hasMainImage = images.some(img => img.imageType === 'main');
+      if (!hasMainImage) {
+        newErrors.images = 'Debes seleccionar una imagen principal';
+      }
     }
 
     setErrors(newErrors);
@@ -509,31 +550,59 @@ export function ProductForm({ initialData }: ProductFormProps) {
     }
 
     setIsSubmitting(true);
+    setErrors({});
 
     try {
-      // TODO: Implementar conexión real con Supabase
-      console.log('Creating product:', {
+      console.log('🚀 Creating product with real connection...');
+
+      const result = await productService.createProduct({
         basicInfo,
         pricing,
         images,
         variants
       });
 
-      // Simulación de creación exitosa
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (result.success) {
+        console.log('✅ Product created successfully:', result.data);
 
-      // Redirigir al listado de productos
-      router.push('/admin/products');
+        // Redirigir al listado de productos
+        router.push('/admin/products');
+      } else {
+        console.error('❌ Error creating product:', result.error);
+        setErrors({ submit: result.error || 'Error al crear el producto' });
+      }
+
     } catch (error) {
-      console.error('Error creating product:', error);
-      setErrors({ submit: 'Error al crear el producto. Por favor intenta de nuevo.' });
+      console.error('❌ Unexpected error:', error);
+      setErrors({ submit: 'Error inesperado al crear el producto. Por favor intenta de nuevo.' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-[#b5b6ad] border-t-[#41423a] rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#676960]">Cargando configuración del formulario...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
+      {/* Error de carga */}
+      {errors.load && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="p-4">
+            <p className="text-red-800">{errors.load}</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Información Básica */}
       <Card className="bg-white border-[#b5b6ad]/30">
         <CardHeader>
@@ -570,15 +639,25 @@ export function ProductForm({ initialData }: ProductFormProps) {
                 <label className="block text-sm font-medium text-[#676960] mb-2">
                   SKU *
                 </label>
-                <input
-                  type="text"
-                  value={basicInfo.sku}
-                  onChange={(e) => setBasicInfo({ ...basicInfo, sku: e.target.value })}
-                  className={`w-full px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${
-                    errors.sku ? 'border-red-300' : 'border-[#b5b6ad]'
-                  }`}
-                  placeholder="UW-001"
-                />
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={basicInfo.sku}
+                    onChange={(e) => setBasicInfo({ ...basicInfo, sku: e.target.value })}
+                    className={`flex-1 px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${
+                      errors.sku ? 'border-red-300' : 'border-[#b5b6ad]'
+                    }`}
+                    placeholder="UW-001"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setBasicInfo({ ...basicInfo, sku: generateSKU() })}
+                    className="px-4 py-2 bg-[#b5b6ad] text-[#1a1b14] rounded-lg hover:bg-[#8e9087] transition-colors text-sm font-medium"
+                    title="Generar SKU automáticamente"
+                  >
+                    🎲
+                  </button>
+                </div>
                 {errors.sku && (
                   <p className="text-sm text-red-600">{errors.sku}</p>
                 )}
@@ -629,6 +708,52 @@ export function ProductForm({ initialData }: ProductFormProps) {
                 placeholder="Breve descripción para el producto"
                 maxLength={200}
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-[#676960] mb-2">
+                  Categoría
+                </label>
+                <select
+                  value={basicInfo.categoryId || ''}
+                  onChange={(e) => setBasicInfo({ ...basicInfo, categoryId: parseInt(e.target.value) || null })}
+                  className="w-full px-4 py-2 border border-[#b5b6ad] rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent"
+                  disabled={isLoading}
+                >
+                  <option value="">Seleccionar categoría</option>
+                  {availableCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+                {isLoading && (
+                  <p className="text-xs text-[#8e9087] mt-1">Cargando categorías...</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#676960] mb-2">
+                  Marca
+                </label>
+                <select
+                  value={basicInfo.brandId || ''}
+                  onChange={(e) => setBasicInfo({ ...basicInfo, brandId: parseInt(e.target.value) || null })}
+                  className="w-full px-4 py-2 border border-[#b5b6ad] rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent"
+                  disabled={isLoading}
+                >
+                  <option value="">Seleccionar marca</option>
+                  {availableBrands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </option>
+                  ))}
+                </select>
+                {isLoading && (
+                  <p className="text-xs text-[#8e9087] mt-1">Cargando marcas...</p>
+                )}
+              </div>
             </div>
 
             <div>
@@ -683,7 +808,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <label className="block text-sm font-medium text-[#676960] mb-2">
-                Precio Regular
+                Precio Principal *
               </label>
               <input
                 type="number"
@@ -698,11 +823,12 @@ export function ProductForm({ initialData }: ProductFormProps) {
               {errors.priceRegular && (
                 <p className="text-sm text-red-600">{errors.priceRegular}</p>
               )}
+              <p className="text-xs text-[#8e9087] mt-1">Este será el precio del producto</p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-[#676960] mb-2">
-                Precio de Venta
+                Precio en Oferta (opcional)
               </label>
               <input
                 type="number"
@@ -717,6 +843,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
               {errors.priceSale && (
                 <p className="text-sm text-red-600">{errors.priceSale}</p>
               )}
+              <p className="text-xs text-[#8e9087] mt-1">Si hay oferta, ingrese precio aquí</p>
             </div>
 
             <div>
