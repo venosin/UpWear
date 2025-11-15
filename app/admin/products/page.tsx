@@ -1,10 +1,9 @@
-/**
- * Página simple de administración de productos
- * Sin dependencias complejas para evitar errores de importación
- */
+'use client';
 
-import { createClient } from '@/lib/supabase/server';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { CreateProductButton } from '@/components/admin/CreateProductButton';
+import ProductActions from '@/components/admin/ProductActions';
 
 interface Product {
   id: number;
@@ -17,204 +16,130 @@ interface Product {
   created_at: string;
 }
 
-/**
- * Obtiene productos desde Supabase
- */
-async function getProducts(): Promise<Product[]> {
-  try {
-    const supabase = await createClient();
+export default function AdminProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, name, sku, price_regular, price_sale, cost_price, is_active, created_at')
-      .order('created_at', { ascending: false })
-      .limit(10);
+  useEffect(() => {
+    loadProducts();
+  }, []);
 
-    if (error) {
-      console.error('Error fetching products:', error);
-      return [];
+  const loadProducts = async () => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, sku, price_regular, price_sale, cost_price, is_active, created_at')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching products:', error);
+      } else {
+        setProducts(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return data || [];
-  } catch (error) {
-    console.error('Error in getProducts:', error);
-    return [];
+  const handleProductDeleted = () => {
+    loadProducts(); // Recargar la lista de productos
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
-}
-
-/**
- * Página principal de administración de productos
- */
-export default async function AdminProductsPage() {
-  const products = await getProducts();
 
   return (
-    <div style={{
-      padding: '20px',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      maxWidth: '1200px',
-      margin: '0 auto'
-    }}>
-      <div style={{
-        marginBottom: '30px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="mb-8 flex justify-between items-center">
         <div>
-          <h1 style={{
-            fontSize: '32px',
-            fontWeight: 'bold',
-            color: '#1a1b14',
-            margin: 0
-          }}>
-            Productos
-          </h1>
-          <p style={{
-            color: '#676960',
-            marginTop: '8px',
-            margin: '8px 0 0 0'
-          }}>
+          <h1 className="text-3xl font-bold text-gray-900">Productos</h1>
+          <p className="text-gray-600 mt-2">
             Gestiona tu catálogo de productos ({products.length} productos)
           </p>
         </div>
-
         <CreateProductButton />
       </div>
 
-      {/* Tabla de productos */}
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        border: '1px solid #e5e7eb',
-        overflow: 'hidden'
-      }}>
+      {/* Products Table */}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
         {products.length === 0 ? (
-          <div style={{
-            padding: '60px 20px',
-            textAlign: 'center',
-            color: '#676960'
-          }}>
-            <h3 style={{
-              fontSize: '18px',
-              fontWeight: '500',
-              marginBottom: '8px',
-              color: '#1a1b14'
-            }}>
-              No hay productos aún
-            </h3>
-            <p style={{ margin: 0 }}>
-              Comienza creando tu primer producto
-            </p>
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No hay productos</h3>
+            <p className="text-gray-500">Comienza creando tu primer producto</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ backgroundColor: '#f9fafb' }}>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontWeight: '500',
-                    color: '#374151',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Nombre
                   </th>
-                  <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontWeight: '500',
-                    color: '#374151',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     SKU
                   </th>
-                  <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontWeight: '500',
-                    color: '#374151',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Precio
                   </th>
-                  <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontWeight: '500',
-                    color: '#374151',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
                   </th>
-                  <th style={{
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    fontWeight: '500',
-                    color: '#374151',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Creado
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Acciones
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="bg-white divide-y divide-gray-200">
                 {products.map((product) => (
-                  <tr key={product.id} style={{
-                    borderBottom: '1px solid #e5e7eb',
-                    ':hover': { backgroundColor: '#f9fafb' }
-                  }}>
-                    <td style={{
-                      padding: '16px',
-                      fontWeight: '500',
-                      color: '#1a1b14'
-                    }}>
-                      {product.name}
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{product.name}</div>
                     </td>
-                    <td style={{
-                      padding: '16px',
-                      color: '#676960',
-                      fontFamily: 'monospace'
-                    }}>
-                      {product.sku}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500 font-mono">{product.sku}</div>
                     </td>
-                    <td style={{
-                      padding: '16px',
-                      color: '#1a1b14',
-                      fontWeight: '500'
-                    }}>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        {product.price_regular ? `$${product.price_regular.toFixed(2)}` : '$0.00'}
+                        <div className="text-sm text-gray-900">
+                          ${product.price_regular ? product.price_regular.toFixed(2) : '0.00'}
+                        </div>
                         {product.price_sale && product.price_sale > 0 && (
-                          <div style={{
-                            fontSize: '12px',
-                            color: '#dc2626',
-                            textDecoration: 'line-through'
-                          }}>
-                            Was: ${product.price_regular.toFixed(2)}
+                          <div className="text-xs text-red-600 line-through">
+                            ${product.price_regular.toFixed(2)}
                           </div>
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: '16px' }}>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        backgroundColor: product.is_active ? '#dcfce7' : '#fef2f2',
-                        color: product.is_active ? '#166534' : '#dc2626'
-                      }}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        product.is_active
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
                         {product.is_active ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
-                    <td style={{
-                      padding: '16px',
-                      color: '#676960',
-                      fontSize: '14px'
-                    }}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(product.created_at).toLocaleDateString('es-ES')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <ProductActions
+                        productId={product.id.toString()}
+                        productName={product.name}
+                        onProductDeleted={handleProductDeleted}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -225,19 +150,14 @@ export default async function AdminProductsPage() {
       </div>
 
       {/* Footer info */}
-      <div style={{
-        marginTop: '20px',
-        padding: '16px',
-        backgroundColor: '#f3f4f6',
-        borderRadius: '8px',
-        fontSize: '14px',
-        color: '#676960'
-      }}>
-        <strong>Conexión Supabase:</strong> {
-          products.length > 0
-            ? '✅ Conectado correctamente'
-            : '⚠️ No se encontraron productos o hay problemas de conexión'
-        }
+      <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+        <p className="text-sm text-gray-600">
+          <strong>Conexión Supabase:</strong> {
+            products.length > 0
+              ? '✅ Conectado correctamente'
+              : '⚠️ No se encontraron productos o hay problemas de conexión'
+          }
+        </p>
       </div>
     </div>
   );

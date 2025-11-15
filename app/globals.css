@@ -74,3 +74,116 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 }
+
+/* Fix for input text visibility issues */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="url"],
+input[type="search"],
+textarea,
+select {
+  color: #111827;
+  background-color: #ffffff;
+  border-color: #d1d5db;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="tel"]:focus,
+input[type="number"]:focus,
+input[type="url"]:focus,
+input[type="search"]:focus,
+textarea:focus,
+select:focus {
+  color: #111827;
+  background-color: #ffffff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Fix for placeholder text */
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280;
+}
+
+/* Fix for disabled inputs */
+input:disabled,
+textarea:disabled,
+select:disabled {
+  color: #6b7280;
+  background-color: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+/* Fix dark theme inputs */
+@media (prefers-color-scheme: dark) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="url"],
+  input[type="search"],
+  textarea,
+  select {
+    color: #f9fafb;
+    background-color: #374151;
+    border-color: #4b5563;
+  }
+
+  input[type="text"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  input[type="tel"]:focus,
+  input[type="number"]:focus,
+  input[type="url"]:focus,
+  input[type="search"]:focus,
+  textarea:focus,
+  select:focus {
+    color: #f9fafb;
+    background-color: #374151;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+  }
+
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    color: #9ca3af;
+    background-color: #1f2937;
+    border-color: #374151;
+  }
+}
+
+/* Dark sidebar specific fixes */
+.bg-gray-900 input,
+.bg-gray-900 textarea,
+.bg-gray-900 select {
+  color: #f9fafb;
+  background-color: #374151;
+  border-color: #4b5563;
+}
+
+.bg-gray-900 input:focus,
+.bg-gray-900 textarea:focus,
+.bg-gray-900 select:focus {
+  color: #f9fafb;
+  background-color: #374151;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.bg-gray-900 input::placeholder,
+.bg-gray-900 textarea::placeholder {
+  color: #9ca3af;
+}

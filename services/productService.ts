@@ -1,66 +1,27 @@
 'use client';
 
-import { createClient } from '@supabase/supabase-js';
+import { BaseService } from '@/lib/services/base-service';
 
 /**
  * Servicio para gestionar operaciones CRUD de productos
  * Conecta con Supabase para persistencia real de datos
  */
-class ProductService {
-  private supabase;
-
-  constructor() {
-    // Agregar logging para debug
-    console.log('🔑 Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-    console.log('🔑 Using anon key:', !!process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
-
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-    );
-
-    // Test connection immediately
-    this.testConnection();
-  }
-
-  async testConnection() {
-    try {
-      const { data, error } = await this.supabase
-        .from('products')
-        .select('id')
-        .limit(1);
-
-      if (error) {
-        console.log('❌ Supabase connection test failed:', error);
-      } else {
-        console.log('✅ Supabase connection test passed');
-      }
-    } catch (err) {
-      console.log('❌ Supabase connection error:', err);
-    }
-  }
+class ProductService extends BaseService {
 
   /**
    * Carga categorías activas desde la base de datos
    */
   async getCategories() {
-    try {
+    return this.executeQuery(async () => {
       const { data, error } = await this.supabase
         .from('categories')
         .select('id, name')
         .eq('is_active', true)
         .order('name');
 
-      if (error) {
-        console.error('Error loading categories:', error);
-        return this.getMockCategories();
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error in getCategories:', error);
-      return this.getMockCategories();
-    }
+      if (error) throw error;
+      return data || this.getMockCategories();
+    }, 'getCategories', this.getMockCategories());
   }
 
   /**
@@ -159,7 +120,7 @@ class ProductService {
           sku: productData.basicInfo.sku,
           description: productData.basicInfo.description,
           short_description: productData.basicInfo.shortDescription,
-          price_regular: productData.pricing.priceRegular, // Precio normal
+          price_original: productData.pricing.priceRegular, // Precio normal (mapeado a price_original)
           price_sale: productData.pricing.priceSale || 0, // Precio en oferta
           cost_price: productData.pricing.costPrice,
           track_inventory: true, // Por defecto activar tracking
@@ -191,7 +152,7 @@ class ProductService {
           is_active: variant.isActive
         }));
 
-        const { error: variantsError } = await this.supabase
+        const { error: variantsError } = await this.adminSupabase
           .from('product_variants')
           .insert(variants);
 
@@ -222,6 +183,273 @@ class ProductService {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
+    }
+  }
+
+  /**
+   * Actualiza un producto existente
+   */
+  async updateProduct(productId: string, updateData: {
+    name?: string;
+    slug?: string;
+    sku?: string;
+    description?: string;
+    short_description?: string;
+    price_regular?: number;
+    price_sale?: number;
+    cost_price?: number;
+    is_active?: boolean;
+    is_featured?: boolean;
+    gender?: string;
+    category_id?: string | null;
+    brand_id?: string | null;
+  }) {
+    try {
+      console.log('🔧 Updating product with data:', updateData);
+
+      // Usar API route de admin para actualizar con SERVICE ROLE KEY
+      const response = await fetch(`/api/admin/products/${productId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        console.error('Error updating product:', result.error);
+        return { success: false, error: result.error };
+      }
+
+      console.log('✅ Product updated successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Error in updateProduct:', error);
+      return { success: false, error };
+    }
+  }
+
+  /**
+   * Obtiene un producto por su ID
+   */
+  async getProductById(productId: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('products')
+        .select(`
+          *,
+          category:categories(name),
+          brand:brands(name)
+        `)
+        .eq('id', productId)
+        .single();
+
+      if (error) {
+        console.error('Error loading product:', error);
+        return null;
+      }
+
+      // Mapear las columnas de la base de datos al formato esperado
+      if (data) {
+        return {
+          ...data,
+          price_regular: data.price_original || data.price_regular, // Mapear price_original a price_regular
+        };
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getProductById:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Obtiene imágenes de un producto
+   */
+  async getProductImages(productId: string) {
+    try {
+      const { data, error } = await this.supabase
+        .from('product_images')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('Error loading product images:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in getProductImages:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Guarda imágenes de producto en la base de datos
+   */
+  async saveProductImages(productId: string, images: Array<{
+    image_url: string;
+    alt_text?: string;
+    image_type?: string;
+    sort_order?: number;
+  }>) {
+    try {
+      const imagesToInsert = images.map((img, index) => ({
+        product_id: productId,
+        image_url: img.image_url,
+        alt_text: img.alt_text || '',
+        image_type: img.image_type || 'product',
+        sort_order: img.sort_order !== undefined ? img.sort_order : index,
+        is_active: true
+      }));
+
+      const { data, error } = await this.supabase
+        .from('product_images')
+        .insert(imagesToInsert)
+        .select();
+
+      if (error) {
+        console.error('Error saving product images:', error);
+        throw new Error(`Error saving images: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in saveProductImages:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualiza información de una imagen
+   */
+  async updateProductImage(imageId: string, updates: {
+    alt_text?: string;
+    sort_order?: number;
+    is_active?: boolean;
+  }) {
+    try {
+      const { data, error } = await this.supabase
+        .from('product_images')
+        .update(updates)
+        .eq('id', imageId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating product image:', error);
+        throw new Error(`Error updating image: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in updateProductImage:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Elimina una imagen (soft delete)
+   */
+  async deleteProductImage(imageId: string) {
+    try {
+      const { error } = await this.supabase
+        .from('product_images')
+        .update({ is_active: false })
+        .eq('id', imageId);
+
+      if (error) {
+        console.error('Error deleting product image:', error);
+        throw new Error(`Error deleting image: ${error.message}`);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error in deleteProductImage:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualiza el orden de las imágenes de un producto
+   */
+  async updateImageOrder(productId: string, imageOrders: Array<{
+    id: string;
+    sort_order: number;
+  }>) {
+    try {
+      const updates = imageOrders.map(({ id, sort_order }) =>
+        this.supabase
+          .from('product_images')
+          .update({ sort_order })
+          .eq('id', id)
+      );
+
+      // Ejecutar todas las actualizaciones en paralelo
+      await Promise.all(updates);
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error in updateImageOrder:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Elimina un producto y sus imágenes asociadas
+   */
+  async deleteProduct(productId: string) {
+    try {
+      // Primero obtener imágenes para eliminarlas del storage
+      const images = await this.getProductImages(productId);
+
+      // Eliminar imágenes del storage
+      if (images.length > 0) {
+        for (const image of images) {
+          try {
+            const imagePath = image.image_url.split('/').pop() || '';
+            await this.supabase.storage
+              .from('upwear-images')
+              .remove([imagePath]);
+          } catch (error) {
+            console.warn('Failed to delete storage image:', image.image_url);
+          }
+        }
+      }
+
+      // Eliminar imágenes de la base de datos
+      await this.supabase
+        .from('product_images')
+        .update({ is_active: false })
+        .eq('product_id', productId);
+
+      // Eliminar variantes del producto
+      await this.supabase
+        .from('product_variants')
+        .update({ is_active: false })
+        .eq('product_id', productId);
+
+      // Eliminar el producto (soft delete)
+      const { error } = await this.supabase
+        .from('products')
+        .update({ is_active: false })
+        .eq('id', productId);
+
+      if (error) {
+        console.error('Error deleting product:', error);
+        return { success: false, error };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error in deleteProduct:', error);
+      return { success: false, error };
     }
   }
 
@@ -281,3 +509,7 @@ class ProductService {
 
 // Exportar singleton
 export const productService = new ProductService();
+
+// Exportar también la clase y el default
+export { ProductService };
+export default ProductService;
