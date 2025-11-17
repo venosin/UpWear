@@ -406,49 +406,26 @@ class ProductService extends BaseService {
    */
   async deleteProduct(productId: string) {
     try {
-      // Primero obtener imágenes para eliminarlas del storage
-      const images = await this.getProductImages(productId);
+      console.log('🗑️ Deleting product via API Route:', productId);
 
-      // Eliminar imágenes del storage
-      if (images.length > 0) {
-        for (const image of images) {
-          try {
-            const imagePath = image.image_url.split('/').pop() || '';
-            await this.supabase.storage
-              .from('upwear-images')
-              .remove([imagePath]);
-          } catch (error) {
-            console.warn('Failed to delete storage image:', image.image_url);
-          }
-        }
+      const response = await fetch(`/api/admin/products/${productId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('❌ Error deleting product via API:', result);
+        return { success: false, error: result.error || 'Failed to delete product' };
       }
 
-      // Eliminar imágenes de la base de datos
-      await this.supabase
-        .from('product_images')
-        .update({ is_active: false })
-        .eq('product_id', productId);
-
-      // Eliminar variantes del producto
-      await this.supabase
-        .from('product_variants')
-        .update({ is_active: false })
-        .eq('product_id', productId);
-
-      // Eliminar el producto (soft delete)
-      const { error } = await this.supabase
-        .from('products')
-        .update({ is_active: false })
-        .eq('id', productId);
-
-      if (error) {
-        console.error('Error deleting product:', error);
-        return { success: false, error };
-      }
-
-      return { success: true };
+      console.log('✅ Product deleted successfully via API');
+      return { success: true, message: result.message };
     } catch (error) {
-      console.error('Error in deleteProduct:', error);
+      console.error('❌ Error in deleteProduct:', error);
       return { success: false, error };
     }
   }

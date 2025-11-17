@@ -55,3 +55,83 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: 'Unexpected error' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const resolvedParams = await params;
+    const productId = resolvedParams.id;
+
+    console.log('🗑️ Admin API: Deleting product', productId);
+
+    // 1. Primero obtener imágenes para eliminarlas del storage
+    const { data: images, error: imagesError } = await supabaseAdmin
+      .from('product_images')
+      .select('image_url')
+      .eq('product_id', productId)
+      .eq('is_active', true);
+
+    if (imagesError) {
+      console.error('❌ Admin API: Error getting product images:', imagesError);
+      // Continuamos con la eliminación aunque falle obtener imágenes
+    }
+
+    // 2. Eliminar imágenes del storage (si existen)
+    if (images && images.length > 0) {
+      for (const image of images) {
+        try {
+          const imagePath = image.image_url.split('/').pop() || '';
+          if (imagePath) {
+            await supabaseAdmin.storage
+              .from('upwear-images')
+              .remove([imagePath]);
+          }
+        } catch (storageError) {
+          console.warn('⚠️ Admin API: Failed to delete storage image:', image.image_url);
+          // Continuamos aunque falle eliminar del storage
+        }
+      }
+    }
+
+    // 3. Soft delete: Eliminar imágenes de la base de datos
+    const { error: deleteImagesError } = await supabaseAdmin
+      .from('product_images')
+      .update({ is_active: false })
+      .eq('product_id', productId);
+
+    if (deleteImagesError) {
+      console.error('❌ Admin API: Error deleting product images:', deleteImagesError);
+      return NextResponse.json({ success: false, error: deleteImagesError.message }, { status: 400 });
+    }
+
+    // 4. Soft delete: Eliminar variantes del producto
+    const { error: deleteVariantsError } = await supabaseAdmin
+      .from('product_variants')
+      .update({ is_active: false })
+      .eq('product_id', productId);
+
+    if (deleteVariantsError) {
+      console.error('❌ Admin API: Error deleting product variants:', deleteVariantsError);
+      return NextResponse.json({ success: false, error: deleteVariantsError.message }, { status: 400 });
+    }
+
+    // 5. Soft delete: Eliminar el producto
+    const { error: deleteProductError } = await supabaseAdmin
+      .from('products')
+      .update({ is_active: false })
+      .eq('id', productId);
+
+    if (deleteProductError) {
+      console.error('❌ Admin API: Error deleting product:', deleteProductError);
+      return NextResponse.json({ success: false, error: deleteProductError.message }, { status: 400 });
+    }
+
+    console.log('✅ Admin API: Product deleted successfully');
+    return NextResponse.json({ success: true, message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error('❌ Admin API: Unexpected error during deletion:', error);
+    return NextResponse.json({ success: false, error: 'Unexpected error during deletion' }, { status: 500 });
+  }
+}

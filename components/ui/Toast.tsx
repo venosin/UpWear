@@ -170,3 +170,109 @@ export const showWarningToast = (message: string, duration?: number) => {
 export const showInfoToast = (message: string, duration?: number) => {
   return showToast(message, 'info', duration);
 };
+
+export const showConfirmDialog = async (
+  title: string,
+  message: string,
+  type: 'danger' | 'warning' | 'info' = 'warning'
+): Promise<boolean> => {
+  // Crear un modal de confirmación inline
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-[50] flex items-center justify-center p-4';
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative z-[60] transform transition-all';
+
+    const iconColors = {
+      danger: 'text-red-500',
+      warning: 'text-yellow-500',
+      info: 'text-blue-500'
+    };
+
+    const bgColors = {
+      danger: 'bg-red-50 border-red-200',
+      warning: 'bg-yellow-50 border-yellow-200',
+      info: 'bg-blue-50 border-blue-200'
+    };
+
+    modalContent.innerHTML = `
+      <div class="flex items-center mb-4">
+        <div class="w-12 h-12 rounded-full flex items-center justify-center ${bgColors[type]} border-2">
+          <svg class="w-6 h-6 ${iconColors[type]}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
+          </svg>
+        </div>
+        <div class="ml-4">
+          <h3 class="text-lg font-semibold text-gray-900">${title}</h3>
+        </div>
+      </div>
+
+      <p class="text-gray-700 mb-6">${message}</p>
+
+      <div class="flex gap-3">
+        <button id="cancel-btn" class="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium">
+          Cancelar
+        </button>
+        <button id="confirm-btn" class="flex-1 px-4 py-2 text-white rounded-lg transition-colors font-medium ${
+          type === 'danger' ? 'bg-red-600 hover:bg-red-700' :
+          type === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700' :
+          'bg-blue-600 hover:bg-blue-700'
+        }">
+          Confirmar
+        </button>
+      </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Prevenir scroll del body
+    document.body.style.overflow = 'hidden';
+
+    const closeModal = () => {
+      document.body.removeChild(modal);
+      document.body.style.overflow = 'unset';
+    };
+
+    // Event listeners
+    document.getElementById('cancel-btn')?.addEventListener('click', () => {
+      closeModal();
+      resolve(false);
+    });
+
+    document.getElementById('confirm-btn')?.addEventListener('click', () => {
+      closeModal();
+      resolve(true);
+    });
+
+    // Cerrar con ESC
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeModal();
+        resolve(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEsc);
+
+    // Cerrar al hacer clic fuera
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeModal();
+        resolve(false);
+      }
+    });
+
+    // Cleanup
+    modal.addEventListener('remove', () => {
+      document.removeEventListener('keydown', handleEsc);
+      document.body.style.overflow = 'unset';
+    });
+  });
+};

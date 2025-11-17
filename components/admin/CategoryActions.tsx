@@ -1,24 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import { productService } from '@/services/productService';
-import EditProductModal from '@/components/admin/EditProductModal';
+import { categoryService } from '@/services/categoryService';
+import EditCategoryModal from '@/components/admin/EditCategoryModal';
 import Modal from '@/components/ui/Modal';
 import { showSuccessToast, showErrorToast } from '@/components/ui/Toast';
 
-interface ProductActionsProps {
-  productId: string;
-  productName: string;
-  onProductDeleted?: () => void;
+interface CategoryActionsProps {
+  categoryId: number;
+  categoryName: string;
+  onCategoryDeleted?: () => void;
+  onCategoryUpdated?: () => void;
   className?: string;
 }
 
-export default function ProductActions({
-  productId,
-  productName,
-  onProductDeleted,
+export default function CategoryActions({
+  categoryId,
+  categoryName,
+  onCategoryDeleted,
+  onCategoryUpdated,
   className = ''
-}: ProductActionsProps) {
+}: CategoryActionsProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -27,25 +29,25 @@ export default function ProductActions({
     setIsDeleting(true);
 
     try {
-      const result = await productService.deleteProduct(productId);
+      const result = await categoryService.deleteCategory(categoryId);
 
       if (result.success) {
-        showSuccessToast('Producto eliminado exitosamente');
+        showSuccessToast('Categoría eliminada exitosamente');
         setShowDeleteModal(false);
-        onProductDeleted?.();
+        onCategoryDeleted?.();
       } else {
-        showErrorToast(`Error al eliminar producto: ${result.error?.message || 'Error desconocido'}`);
+        showErrorToast(`Error al eliminar categoría: ${result.error?.message || 'Error desconocido'}`);
       }
     } catch (error) {
-      showErrorToast('Error inesperado al eliminar producto');
+      showErrorToast('Error inesperado al eliminar categoría');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleProductUpdated = () => {
-    // Refrescar la lista de productos si se proporciona la función
-    onProductDeleted?.(); // Reutilizamos la misma función para refrescar
+  const handleCategoryUpdated = () => {
+    setShowEditModal(false);
+    onCategoryUpdated?.();
   };
 
   return (
@@ -78,17 +80,17 @@ export default function ProductActions({
           {/* Icono de advertencia */}
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
             <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
           </div>
 
           {/* Mensaje simple */}
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            ¿Eliminar "{productName}"?
+            ¿Eliminar "{categoryName}"?
           </h3>
 
           <p className="text-sm text-red-600 mb-6">
-            ⚠️ Esta acción no se puede deshacer
+            ⚠️ Esta acción no se puede deshacer. La categoría se marcará como inactiva.
           </p>
 
           {/* Botones */}
@@ -111,12 +113,12 @@ export default function ProductActions({
         </div>
       </Modal>
 
-      {/* Edit Product Modal */}
-      <EditProductModal
+      {/* Edit Category Modal */}
+      <EditCategoryModal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
-        productId={productId}
-        onProductUpdated={handleProductUpdated}
+        categoryId={categoryId}
+        onCategoryUpdated={handleCategoryUpdated}
       />
     </div>
   );

@@ -1,0 +1,187 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { RegisterRequest, CustomerValidation } from '@/types/customers';
+
+// Crear cliente de Supabase con SERVICE ROLE KEY para operaciones de admin
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(request: NextRequest) {
+  try {
+    const body: RegisterRequest = await request.json();
+
+    console.log('🔐 Auth API: User registration attempt', { email: body.email });
+
+    // Validar datos requeridos
+    if (!body.email || !body.password) {
+      console.error('❌ Auth API: Email and password are required');
+      return NextResponse.json({
+        success: false,
+        error: 'Email y contraseña son requeridos'
+      }, { status: 400 });
+    }
+
+    if (!body.accept_terms || !body.accept_privacy) {
+      console.error('❌ Auth API: Terms and privacy acceptance required');
+      return NextResponse.json({
+        success: false,
+        error: 'Debes aceptar los términos y condiciones y la política de privacidad'
+      }, { status: 400 });
+    }
+
+    // Validar formato de email
+    if (!CustomerValidation.isValidEmail(body.email)) {
+      console.error('❌ Auth API: Invalid email format');
+      return NextResponse.json({
+        success: false,
+        error: 'Formato de email inválido'
+      }, { status: 400 });
+    }
+
+    // Validar contraseña
+    const passwordValidation = CustomerValidation.isValidPassword(body.password);
+    if (!passwordValidation.valid) {
+      console.error('❌ Auth API: Weak password', passwordValidation.errors);
+      return NextResponse.json({
+        success: false,
+        error: passwordValidation.errors.join('. ')
+      }, { status: 400 });
+    }
+
+    // Validar teléfono si se proporciona
+    if (body.phone && !CustomerValidation.isValidPhone(body.phone)) {
+      console.error('❌ Auth API: Invalid phone format');
+      return NextResponse.json({
+        success: false,
+        error: 'Formato de teléfono inválido'
+      }, { status: 400 });
+    }
+
+    // Validar fecha de nacimiento si se proporciona
+    if (body.birth_date && !CustomerValidation.isValidDate(body.birth_date)) {
+      console.error('❌ Auth API: Invalid birth date format');
+      return NextResponse.json({
+        success: false,
+        error: 'Formato de fecha de nacimiento inválido. Usa YYYY-MM-DD'
+      }, { status: 400 });
+    }
+
+    // Verificar que el email no exista ya en auth.users
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers({
+      filters: {
+        email: body.email
+      },
+      page: 1,
+      perPage: 1
+    });
+
+    if (existingUsers && existingUsers.users && existingUsers.users.length > 0) {
+      console.error('❌ Auth API: Email already registered');
+      return NextResponse.json({
+        success: false,
+        error: 'El email ya está registrado'
+      }, { status: 400 });
+    }
+
+    // Crear usuario en auth.users
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email: body.email,
+      password: body.password,
+      email_confirm: false, // No confirmar email automáticamente
+      user_metadata: {
+        full_name: body.full_name || null,
+        phone: body.phone || null,
+        birth_date: body.birth_date || null,
+        gender: body.gender || 'none',
+        accept_terms: body.accept_terms,
+        accept_privacy: body.accept_privacy,
+        subscribe_newsletter: body.subscribe_newsletter || false,
+        registration_source: 'web'
+      }
+    });
+
+    if (authError || !authData.user) {
+      console.error('❌ Auth API Error creating auth user:', authError);
+      return NextResponse.json({
+        success: false,
+        error: authError?.message || 'Error al crear usuario'
+      }, { status: 400 });
+    }
+
+    // Crear perfil en la tabla profiles
+    const { data: profileData, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert({
+        id: authData.user.id,
+        full_name: body.full_name || null,
+        phone: body.phone || null,
+        role: 'customer', // Todos los registros son clientes por defecto
+        avatar_url: null,
+        email_verified: false, // Se verifica cuando el usuario confirma su email
+        phone_verified: false,
+        birth_date: body.birth_date || null,
+        gender: body.gender || 'none',
+        preferences: {
+          newsletter: body.subscribe_newsletter || false,
+          language: 'es-MX'
+        },
+        metadata: {
+          registration_source: 'web',
+          accept_terms: body.accept_terms,
+          accept_privacy: body.accept_privacy,
+          registration_ip: request.headers.get('x-forwarded-for') || 'unknown'
+        }
+      })
+      .select()
+      .single();
+
+    if (profileError) {
+      console.error('❌ Auth API Error creating profile:', profileError);
+      // Si falla la creación del perfil, intentar eliminar el usuario de auth
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      return NextResponse.json({
+        success: false,
+        error: profileError.message || 'Error al crear perfil de usuario'
+      }, { status: 400 });
+    }
+
+    // Enviar email de verificación
+    const { error: emailError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'signup',
+      email: body.email,
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify-email`
+      }
+    });
+
+    if (emailError) {
+      console.warn('⚠️ Auth API: Could not send verification email:', emailError);
+      // No fallamos el registro si no se puede enviar el email, solo lo registramos
+    }
+
+    console.log('✅ Auth API: User registered successfully', {
+      userId: authData.user.id,
+      email: body.email
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Usuario registrado exitosamente. Revisa tu email para verificar tu cuenta.',
+      user: {
+        id: authData.user.id,
+        email: authData.user.email,
+        full_name: body.full_name
+      },
+      needsEmailVerification: true
+    });
+
+  } catch (error) {
+    console.error('❌ Auth API: Unexpected error during registration:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Error inesperado durante el registro'
+    }, { status: 500 });
+  }
+}

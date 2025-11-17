@@ -1,154 +1,311 @@
-import { createClient } from '@supabase/supabase-js';
+'use client';
+
+import { BaseService } from '@/lib/services/base-service';
+import { Brand, BrandCreate, BrandUpdate, BrandValidation } from '@/types/brands';
 
 /**
  * Servicio para gestionar operaciones CRUD de marcas
+ * Conecta con Supabase para persistencia real de datos
  */
-class BrandService {
-  private supabase;
-
-  constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
-    );
-  }
+class BrandService extends BaseService {
 
   /**
-   * Obtiene todas las marcas
+   * Obtiene todas las marcas activas desde la base de datos
    */
-  async getBrands() {
+  async getBrands(): Promise<Brand[]> {
     try {
       const { data, error } = await this.supabase
         .from('brands')
-        .select('*')
+        .select(`
+          id,
+          name,
+          slug,
+          description,
+          logo_url,
+          banner_url,
+          country,
+          website_url,
+          is_featured,
+          is_active,
+          metadata,
+          created_at,
+          updated_at
+        `)
+        .eq('is_active', true)
+        .order('is_featured', { ascending: false })
         .order('name', { ascending: true });
 
       if (error) {
         console.error('Error loading brands:', error);
-        return [];
+        throw error;
       }
 
       return data || [];
     } catch (error) {
       console.error('Error in getBrands:', error);
-      return [];
+      throw error;
     }
   }
 
   /**
-   * Crea una nueva marca
+   * Obtiene todas las marcas (incluyendo inactivas) para admin
    */
-  async createBrand(brandData: {
-    name: string;
-    slug?: string;
-    description?: string;
-  }) {
+  async getAllBrands(): Promise<Brand[]> {
     try {
       const { data, error } = await this.supabase
         .from('brands')
-        .insert({
-          name: brandData.name,
-          slug: brandData.slug || this.generateSlug(brandData.name),
-          description: brandData.description || '',
-          is_active: true
-        })
-        .select()
-        .single();
+        .select(`
+          id,
+          name,
+          slug,
+          description,
+          logo_url,
+          banner_url,
+          country,
+          website_url,
+          is_featured,
+          is_active,
+          metadata,
+          created_at,
+          updated_at
+        `)
+        .order('is_featured', { ascending: false })
+        .order('name', { ascending: true });
 
       if (error) {
-        console.error('Error creating brand:', error);
-        return { success: false, error };
+        console.error('Error loading all brands:', error);
+        throw error;
       }
 
-      return { success: true, data };
+      return data || [];
     } catch (error) {
-      console.error('Error in createBrand:', error);
-      return { success: false, error };
+      console.error('Error in getAllBrands:', error);
+      throw error;
     }
   }
 
   /**
-   * Actualiza una marca existente
+   * Obtiene marcas destacadas
    */
-  async updateBrand(brandId: string, updateData: {
-    name?: string;
-    slug?: string;
-    description?: string;
-    is_active?: boolean;
-  }) {
+  async getFeaturedBrands(): Promise<Brand[]> {
     try {
-      const { error } = await this.supabase
+      const { data, error } = await this.supabase
         .from('brands')
-        .update(updateData)
-        .eq('id', brandId);
+        .select(`
+          id,
+          name,
+          slug,
+          description,
+          logo_url,
+          banner_url,
+          country,
+          website_url,
+          is_featured,
+          is_active,
+          metadata,
+          created_at,
+          updated_at
+        `)
+        .eq('is_active', true)
+        .eq('is_featured', true)
+        .order('name', { ascending: true });
 
       if (error) {
-        console.error('Error updating brand:', error);
-        return { success: false, error };
+        console.error('Error loading featured brands:', error);
+        throw error;
       }
 
-      return { success: true };
+      return data || [];
     } catch (error) {
-      console.error('Error in updateBrand:', error);
+      console.error('Error in getFeaturedBrands:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crea una nueva marca usando API Route admin
+   */
+  async createBrand(brandData: BrandCreate) {
+    try {
+      console.log('🔧 Creating brand via API Route:', brandData);
+
+      // Validaciones específicas
+      if (!brandData.name || brandData.name.trim() === '') {
+        return { success: false, error: { message: 'Brand name is required' } };
+      }
+
+      // Validar country si se proporciona
+      if (brandData.country && !BrandValidation.isValidCountryCode(brandData.country)) {
+        return { success: false, error: { message: 'Invalid country code. Must be ISO 3166-1 alpha-2 (2 characters)' } };
+      }
+
+      // Validar URLs si se proporcionan
+      if (brandData.logo_url && !BrandValidation.isValidUrl(brandData.logo_url)) {
+        return { success: false, error: { message: 'Invalid logo URL' } };
+      }
+
+      if (brandData.banner_url && !BrandValidation.isValidUrl(brandData.banner_url)) {
+        return { success: false, error: { message: 'Invalid banner URL' } };
+      }
+
+      if (brandData.website_url && !BrandValidation.isValidUrl(brandData.website_url)) {
+        return { success: false, error: { message: 'Invalid website URL' } };
+      }
+
+      // Generar slug si no se proporciona
+      if (!brandData.slug) {
+        brandData.slug = BrandValidation.generateSlug(brandData.name);
+      }
+
+      const response = await fetch('/api/admin/brands', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(brandData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('❌ Error creating brand via API:', result);
+        return { success: false, error: result.error || 'Failed to create brand' };
+      }
+
+      console.log('✅ Brand created successfully via API');
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('❌ Error in createBrand:', error);
       return { success: false, error };
     }
   }
 
   /**
-   * Elimina una marca (soft delete)
+   * Actualiza una marca usando API Route admin
    */
-  async deleteBrand(brandId: string) {
+  async updateBrand(brandId: number, updateData: BrandUpdate) {
     try {
-      // Verificar si hay productos usando esta marca
-      const { data: products, error: checkError } = await this.supabase
-        .from('products')
-        .select('id')
-        .eq('brand_id', brandId)
-        .eq('is_active', true)
-        .limit(1);
+      console.log('🔧 Updating brand via API Route:', brandId, updateData);
 
-      if (checkError) {
-        console.error('Error checking products:', checkError);
-        return { success: false, error: checkError };
+      // Validaciones específicas
+      if (updateData.country && !BrandValidation.isValidCountryCode(updateData.country)) {
+        return { success: false, error: { message: 'Invalid country code. Must be ISO 3166-1 alpha-2 (2 characters)' } };
       }
 
-      if (products && products.length > 0) {
+      if (updateData.logo_url && !BrandValidation.isValidUrl(updateData.logo_url)) {
+        return { success: false, error: { message: 'Invalid logo URL' } };
+      }
+
+      if (updateData.banner_url && !BrandValidation.isValidUrl(updateData.banner_url)) {
+        return { success: false, error: { message: 'Invalid banner URL' } };
+      }
+
+      if (updateData.website_url && !BrandValidation.isValidUrl(updateData.website_url)) {
+        return { success: false, error: { message: 'Invalid website URL' } };
+      }
+
+      const response = await fetch(`/api/admin/brands/${brandId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('❌ Error updating brand via API:', result);
+        return { success: false, error: result.error || 'Failed to update brand' };
+      }
+
+      console.log('✅ Brand updated successfully via API');
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('❌ Error in updateBrand:', error);
+      return { success: false, error };
+    }
+  }
+
+  /**
+   * Elimina una marca (soft delete) usando API Route admin
+   */
+  async deleteBrand(brandId: number) {
+    try {
+      console.log('🗑️ Deleting brand via API Route:', brandId);
+
+      // Verificar si hay productos activos usando esta marca
+      const response = await fetch(`/api/admin/brands/${brandId}`);
+      const brandData = await response.json();
+
+      if (brandData.success && brandData.data && brandData.data.product_count > 0) {
         return {
           success: false,
-          error: { message: 'No se puede eliminar una marca que tiene productos activos' }
+          error: { message: 'Cannot delete brand with active products' }
         };
       }
 
-      // Soft delete
-      const { error } = await this.supabase
-        .from('brands')
-        .update({ is_active: false })
-        .eq('id', brandId);
+      const deleteResponse = await fetch(`/api/admin/brands/${brandId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) {
-        console.error('Error deleting brand:', error);
-        return { success: false, error };
+      const result = await deleteResponse.json();
+
+      if (!deleteResponse.ok) {
+        console.error('❌ Error deleting brand via API:', result);
+        return { success: false, error: result.error || 'Failed to delete brand' };
       }
 
-      return { success: true };
+      console.log('✅ Brand deleted successfully via API');
+      return { success: true, message: result.message };
     } catch (error) {
-      console.error('Error in deleteBrand:', error);
+      console.error('❌ Error in deleteBrand:', error);
       return { success: false, error };
     }
   }
 
   /**
-   * Genera slug a partir del nombre
+   * Busca marcas por nombre
    */
-  generateSlug(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+  async searchBrands(query: string): Promise<Brand[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('brands')
+        .select(`
+          id,
+          name,
+          slug,
+          description,
+          logo_url,
+          banner_url,
+          country,
+          website_url,
+          is_featured,
+          is_active,
+          metadata,
+          created_at,
+          updated_at
+        `)
+        .eq('is_active', true)
+        .ilike('name', `%${query}%`)
+        .order('name', { ascending: true })
+        .limit(10);
+
+      if (error) {
+        console.error('Error searching brands:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error in searchBrands:', error);
+      throw error;
+    }
   }
 }
 
-// Exportar singleton
+// Singleton pattern
 export const brandService = new BrandService();
-export { BrandService };
-export default BrandService;
