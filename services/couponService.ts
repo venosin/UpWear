@@ -20,7 +20,7 @@ class CouponService {
     try {
       const { data, error } = await this.supabase
         .from('coupons')
-        .select('*')
+        .select('id, code, name, description, discount_type, discount_value, minimum_amount, usage_limit, used_count, valid_from, valid_to, is_active, created_at')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -40,27 +40,33 @@ class CouponService {
    */
   async createCoupon(couponData: {
     code: string;
-    type: 'percentage' | 'fixed_amount';
-    value: number;
+    name: string;
+    discount_type: 'percentage' | 'fixed_amount' | 'free_shipping';
+    discount_value: number;
+    description?: string;
     minimum_amount?: number;
     usage_limit?: number;
-    usage_count?: number;
-    expires_at?: string;
+    used_count?: number;
+    valid_from?: string;
+    valid_to?: string;
   }) {
     try {
       const { data, error } = await this.supabase
         .from('coupons')
         .insert({
           code: couponData.code.toUpperCase(),
-          type: couponData.type,
-          value: couponData.value,
+          name: couponData.name,
+          description: couponData.description || null,
+          discount_type: couponData.discount_type,
+          discount_value: couponData.discount_value,
           minimum_amount: couponData.minimum_amount || null,
           usage_limit: couponData.usage_limit || null,
-          usage_count: couponData.usage_count || 0,
-          expires_at: couponData.expires_at || null,
+          used_count: couponData.used_count || 0,
+          valid_from: couponData.valid_from || null,
+          valid_to: couponData.valid_to || null,
           is_active: true
         })
-        .select()
+        .select('id, code, name, description, discount_type, discount_value, minimum_amount, usage_limit, used_count, valid_from, valid_to, is_active, created_at')
         .single();
 
       if (error) {
@@ -80,11 +86,15 @@ class CouponService {
    */
   async updateCoupon(couponId: string, updateData: {
     code?: string;
-    type?: 'percentage' | 'fixed_amount';
-    value?: number;
+    name?: string;
+    discount_type?: 'percentage' | 'fixed_amount' | 'free_shipping';
+    discount_value?: number;
+    description?: string;
     minimum_amount?: number;
     usage_limit?: number;
-    expires_at?: string;
+    usage_limit_per_user?: number;
+    valid_from?: string;
+    valid_to?: string;
     is_active?: boolean;
   }) {
     try {
@@ -139,7 +149,7 @@ class CouponService {
     try {
       const { data, error } = await this.supabase
         .from('coupons')
-        .select('*')
+        .select('id, code, name, discount_type, discount_value, minimum_amount, usage_limit, used_count, valid_from, valid_to, is_active')
         .eq('code', code.toUpperCase())
         .eq('is_active', true)
         .single();
@@ -149,7 +159,7 @@ class CouponService {
       }
 
       // Check expiration
-      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      if (data.valid_to && new Date(data.valid_to) < new Date()) {
         return { valid: false, reason: 'Cupón expirado' };
       }
 
@@ -159,7 +169,7 @@ class CouponService {
       }
 
       // Check usage limit
-      if (data.usage_limit && data.usage_count >= data.usage_limit) {
+      if (data.usage_limit && data.used_count >= data.usage_limit) {
         return { valid: false, reason: 'Límite de usos alcanzado' };
       }
 
@@ -177,7 +187,7 @@ class CouponService {
     try {
       const { error } = await this.supabase
         .from('coupons')
-        .update({ usage_count: this.supabase.rpc('increment', { x: 1, column_name: 'usage_count' }) })
+        .update({ used_count: this.supabase.rpc('increment', { x: 1, column_name: 'used_count' }) })
         .eq('id', couponId);
 
       if (error) {
@@ -206,13 +216,13 @@ class CouponService {
         .from('coupons')
         .select('id', { count: 'exact', head: true })
         .eq('is_active', true)
-        .lt('expires_at', new Date().toISOString());
+        .lt('valid_to', new Date().toISOString());
 
       const { data: totalUsage } = await this.supabase
         .from('coupons')
-        .select('usage_count');
+        .select('id, used_count');
 
-      const totalUsageCount = totalUsage?.reduce((sum, coupon) => sum + coupon.usage_count, 0) || 0;
+      const totalUsageCount = totalUsage?.reduce((sum, coupon) => sum + coupon.used_count, 0) || 0;
 
       return {
         activeCoupons: activeCoupons?.length || 0,

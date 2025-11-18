@@ -1,0 +1,6 @@
+{
+  "code": "TEST123",
+  "name": "Cupón de Prueba",
+  "discount_type": "percentage",
+  "discount_value": 15
+}

@@ -58,8 +58,8 @@ export default function Modal({
 
   return (
     <>
-      {/* Backdrop con blur - z-index apropiado */}
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[50]">
+      {/* Backdrop con blur - transparente como lo hacemos normalmente */}
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[50]">
         <div className="flex items-center justify-center min-h-screen p-4">
           {/* Modal */}
           <div
