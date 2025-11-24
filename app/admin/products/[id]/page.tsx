@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { notFound } from 'next/navigation';
 import { productService } from '@/services/productService';
+import ProductEditClient from './ProductEditClient';
 
 interface Product {
   id: string;

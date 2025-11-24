@@ -115,13 +115,19 @@ export default function ProductImageGallery({
             )}
 
             <div className="aspect-square relative">
-              <Image
-                src={image.image_url}
-                alt={image.alt_text || `Product image ${index + 1}`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              />
+              {image.image_url ? (
+                <Image
+                  src={image.image_url}
+                  alt={image.alt_text || `Product image ${index + 1}`}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                  <span className="text-xs">No image</span>
+                </div>
+              )}
             </div>
 
             <div className="p-3 space-y-2">

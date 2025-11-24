@@ -60,6 +60,7 @@ interface ProductImage {
   altText: string;
   imageType: 'main' | 'gallery' | 'thumbnail';
   sortOrder?: number;
+  file?: File; // Archivo real para subir a Supabase
 }
 
 /**
@@ -85,7 +86,7 @@ function ImageUpload({
   isUploading: boolean;
 }) {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files);
+    const files = event.target.files ? Array.from(event.target.files) : [];
 
     for (const file of files) {
       if (file.type.startsWith('image/')) {
@@ -96,7 +97,8 @@ function ImageUpload({
           url: tempUrl,
           altText: file.name,
           imageType: 'gallery',
-          sortOrder: images.length
+          sortOrder: images.length,
+          file: file // Guardamos el archivo real
         };
 
         onImagesChange([...images, newImage]);
@@ -148,7 +150,7 @@ function ImageUpload({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {images.map((image, index) => (
             <div key={index} className="relative group">
-              <div className="aspect-square bg-[#b5b6ad]/10 rounded-lg overflow-hidden">
+              <div className="relative aspect-square bg-[#b5b6ad]/10 rounded-lg overflow-hidden">
                 {image.url ? (
                   <Image
                     src={image.url}
@@ -164,11 +166,10 @@ function ImageUpload({
 
                 {/* Badge de tipo de imagen */}
                 <div className="absolute top-2 left-2">
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${
-                    image.imageType === 'main'
-                      ? 'bg-[#41423a] text-white'
-                      : 'bg-[#b5b6ad] text-[#41423a]'
-                  }`}>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${image.imageType === 'main'
+                    ? 'bg-[#41423a] text-white'
+                    : 'bg-[#b5b6ad] text-[#41423a]'
+                    }`}>
                     {image.imageType === 'main' ? 'Principal' : 'Galería'}
                   </span>
                 </div>
@@ -382,7 +383,7 @@ function VariantsSection({
 
               <Button
                 onClick={addVariant}
-                variant="outlined"
+                variant="bordered"
                 className="w-full border-[#41423a] text-[#41423a] hover:bg-[#41423a] hover:text-white"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -625,9 +626,8 @@ export function ProductForm({ initialData }: ProductFormProps) {
                       setBasicInfo(prev => ({ ...prev, slug: generateSlug(e.target.value) }));
                     }
                   }}
-                  className={`w-full px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${
-                    errors.name ? 'border-red-300' : 'border-[#b5b6ad]'
-                  }`}
+                  className={`w-full px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${errors.name ? 'border-red-300' : 'border-[#b5b6ad]'
+                    }`}
                   placeholder="Camiseta UpWear Classic"
                 />
                 {errors.name && (
@@ -644,9 +644,8 @@ export function ProductForm({ initialData }: ProductFormProps) {
                     type="text"
                     value={basicInfo.sku}
                     onChange={(e) => setBasicInfo({ ...basicInfo, sku: e.target.value })}
-                    className={`flex-1 px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${
-                      errors.sku ? 'border-red-300' : 'border-[#b5b6ad]'
-                    }`}
+                    className={`flex-1 px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${errors.sku ? 'border-red-300' : 'border-[#b5b6ad]'
+                      }`}
                     placeholder="UW-001"
                   />
                   <button
@@ -764,9 +763,8 @@ export function ProductForm({ initialData }: ProductFormProps) {
                 value={basicInfo.description}
                 onChange={(e) => setBasicInfo({ ...basicInfo, description: e.target.value })}
                 rows={4}
-                className={`w-full px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${
-                  errors.description ? 'border-red-300' : 'border-[#b5b6ad]'
-                }`}
+                className={`w-full px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${errors.description ? 'border-red-300' : 'border-[#b5b6ad]'
+                  }`}
                 placeholder="Describe el producto detalladamente, incluyendo materiales, características, etc."
               />
               {errors.description && (
@@ -815,9 +813,8 @@ export function ProductForm({ initialData }: ProductFormProps) {
                 step="0.01"
                 value={pricing.priceRegular}
                 onChange={(e) => setPricing({ ...pricing, priceRegular: parseFloat(e.target.value) || 0 })}
-                className={`w-full px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${
-                  errors.priceRegular ? 'border-red-300' : 'border-[#b5b6ad]'
-                }`}
+                className={`w-full px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${errors.priceRegular ? 'border-red-300' : 'border-[#b5b6ad]'
+                  }`}
                 placeholder="99.99"
               />
               {errors.priceRegular && (
@@ -835,9 +832,8 @@ export function ProductForm({ initialData }: ProductFormProps) {
                 step="0.01"
                 value={pricing.priceSale}
                 onChange={(e) => setPricing({ ...pricing, priceSale: parseFloat(e.target.value) || 0 })}
-                className={`w-full px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${
-                  errors.priceSale ? 'border-red-300' : 'border-[#b5b6ad]'
-                }`}
+                className={`w-full px-4 py-2 border rounded-lg text-sm text-[#1a1b14] focus:outline-none focus:ring-2 focus:ring-[#41423a] focus:border-transparent placeholder-[#8e9087] ${errors.priceSale ? 'border-red-300' : 'border-[#b5b6ad]'
+                  }`}
                 placeholder="79.99"
               />
               {errors.priceSale && (
@@ -904,7 +900,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
       {/* Botones de Acción */}
       <div className="flex justify-end space-x-4">
         <Button
-          variant="outlined"
+          variant="bordered"
           onClick={() => router.push('/admin/products')}
           className="border-[#41423a] text-[#41423a] hover:bg-[#41423a] hover:text-white"
         >

@@ -29,14 +29,19 @@ export default function AdminProductsPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, sku, price_regular, price_sale, cost_price, is_active, created_at')
+        .select('id, name, sku, price_original, price_sale, cost_price, is_active, created_at')
         .order('created_at', { ascending: false })
         .limit(10);
 
       if (error) {
         console.error('Error fetching products:', error);
       } else {
-        setProducts(data || []);
+        // Map price_original to price_regular for frontend compatibility
+        const mappedData = (data || []).map(product => ({
+          ...product,
+          price_regular: product.price_original || 0
+        }));
+        setProducts(mappedData);
       }
     } catch (error) {
       console.error('Error loading products:', error);
@@ -123,11 +128,10 @@ export default function AdminProductsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        product.is_active
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${product.is_active
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
-                      }`}>
+                        }`}>
                         {product.is_active ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>

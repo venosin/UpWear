@@ -110,6 +110,7 @@ class ProductService extends BaseService {
   async createProduct(productData: any) {
     try {
       console.log('🚀 Creating product with data:', productData);
+      console.log('🧐 Gender value being sent:', productData.basicInfo.gender);
 
       // 1. Crear el producto principal
       const { data: product, error: productError } = await this.supabase
@@ -120,10 +121,10 @@ class ProductService extends BaseService {
           sku: productData.basicInfo.sku,
           description: productData.basicInfo.description,
           short_description: productData.basicInfo.shortDescription,
-          price_original: productData.pricing.priceRegular, // Precio normal (mapeado a price_original)
-          price_sale: productData.pricing.priceSale || 0, // Precio en oferta
+          price_original: productData.pricing.priceRegular,
+          price_sale: productData.pricing.priceSale || 0,
           cost_price: productData.pricing.costPrice,
-          track_inventory: true, // Por defecto activar tracking
+          track_inventory: true,
           is_active: productData.basicInfo.isActive,
           is_featured: productData.basicInfo.isFeatured,
           gender: productData.basicInfo.gender,
@@ -148,7 +149,7 @@ class ProductService extends BaseService {
           price_override: variant.priceOverride,
           stock_quantity: variant.stockQuantity,
           size_id: variant.sizeId,
-          color_id: variant.colorId || null, // Ahora debería existir después del SQL
+          color_id: variant.colorId || null,
           is_active: variant.isActive
         }));
 
@@ -158,17 +159,53 @@ class ProductService extends BaseService {
 
         if (variantsError) {
           console.error('❌ Error creating variants:', variantsError);
-          throw new Error(`Error creating variants: ${variantsError.message}`);
+        } else {
+          console.log('✅ Variants created successfully');
         }
-
-        console.log('✅ Variants created successfully');
       }
 
-      // 3. Subir imágenes (TODO: Implementar upload a Supabase Storage)
+      // 3. Subir imágenes a Supabase Storage
       if (productData.images && productData.images.length > 0) {
-        console.log('📸 Images to upload:', productData.images);
-        // TODO: Implementar upload real a Supabase Storage
-        // Por ahora solo log
+        console.log('📸 Uploading images to Supabase Storage...');
+
+        const { uploadProductImage } = await import('@/services/imageService');
+
+        for (let i = 0; i < productData.images.length; i++) {
+          const img = productData.images[i];
+
+          if (img.file) {
+            console.log(`Uploading image ${i + 1}/${productData.images.length}:`, img.altText);
+
+            const { url, error } = await uploadProductImage(
+              img.file,
+              product.id.toString(),
+              'products'
+            );
+
+            if (error) {
+              console.error('Error uploading image:', error);
+              continue;
+            }
+
+            // Guardar la URL real en la base de datos
+            const { error: dbError } = await this.supabase
+              .from('product_images')
+              .insert({
+                product_id: product.id,
+                url: url, // CORREGIDO: usar 'url'
+                alt_text: img.altText || '',
+                image_type: img.imageType,
+                order_index: i, // CORREGIDO: usar 'order_index'
+                is_active: true
+              });
+
+            if (dbError) {
+              console.error('Error saving image to database:', dbError);
+            } else {
+              console.log('✅ Image uploaded and saved:', url);
+            }
+          }
+        }
       }
 
       return {
@@ -276,14 +313,19 @@ class ProductService extends BaseService {
         .select('*')
         .eq('product_id', productId)
         .eq('is_active', true)
-        .order('sort_order', { ascending: true });
+        .order('order_index', { ascending: true }); // CORREGIDO: order_index
 
       if (error) {
         console.error('Error loading product images:', error);
         return [];
       }
 
-      return data || [];
+      // Mapear para el frontend
+      return (data || []).map(img => ({
+        ...img,
+        image_url: img.url, // Mapear url -> image_url
+        sort_order: img.order_index // Mapear order_index -> sort_order
+      }));
     } catch (error) {
       console.error('Error in getProductImages:', error);
       return [];
@@ -302,10 +344,10 @@ class ProductService extends BaseService {
     try {
       const imagesToInsert = images.map((img, index) => ({
         product_id: productId,
-        image_url: img.image_url,
+        url: img.image_url, // CORREGIDO: image_url -> url
         alt_text: img.alt_text || '',
         image_type: img.image_type || 'product',
-        sort_order: img.sort_order !== undefined ? img.sort_order : index,
+        order_index: img.sort_order !== undefined ? img.sort_order : index, // CORREGIDO: sort_order -> order_index
         is_active: true
       }));
 
@@ -335,9 +377,15 @@ class ProductService extends BaseService {
     is_active?: boolean;
   }) {
     try {
+      // Mapear sort_order a order_index
+      const dbUpdates: any = {};
+      if (updates.alt_text !== undefined) dbUpdates.alt_text = updates.alt_text;
+      if (updates.sort_order !== undefined) dbUpdates.order_index = updates.sort_order;
+      if (updates.is_active !== undefined) dbUpdates.is_active = updates.is_active;
+
       const { data, error } = await this.supabase
         .from('product_images')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', imageId)
         .select()
         .single();
@@ -387,7 +435,7 @@ class ProductService extends BaseService {
       const updates = imageOrders.map(({ id, sort_order }) =>
         this.supabase
           .from('product_images')
-          .update({ sort_order })
+          .update({ order_index: sort_order }) // CORREGIDO: order_index
           .eq('id', id)
       );
 

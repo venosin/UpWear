@@ -69,7 +69,7 @@ export async function DELETE(
     // 1. Primero obtener imágenes para eliminarlas del storage
     const { data: images, error: imagesError } = await supabaseAdmin
       .from('product_images')
-      .select('image_url')
+      .select('url')
       .eq('product_id', productId)
       .eq('is_active', true);
 
@@ -82,14 +82,22 @@ export async function DELETE(
     if (images && images.length > 0) {
       for (const image of images) {
         try {
-          const imagePath = image.image_url.split('/').pop() || '';
+          // Extraer el path relativo del archivo desde la URL completa
+          let imagePath = '';
+          if (image.url && image.url.includes('product-images/')) {
+            imagePath = image.url.split('product-images/')[1];
+          } else if (image.url) {
+            // Fallback si solo se guardó el nombre
+            imagePath = image.url.split('/').pop() || '';
+          }
+
           if (imagePath) {
             await supabaseAdmin.storage
-              .from('upwear-images')
+              .from('product-images')
               .remove([imagePath]);
           }
         } catch (storageError) {
-          console.warn('⚠️ Admin API: Failed to delete storage image:', image.image_url);
+          console.warn('⚠️ Admin API: Failed to delete storage image:', image.url);
           // Continuamos aunque falle eliminar del storage
         }
       }

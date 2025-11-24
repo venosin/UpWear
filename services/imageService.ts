@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 
 export async function uploadProductImage(
   file: File,
@@ -6,11 +6,8 @@ export async function uploadProductImage(
   folder: string = 'products'
 ): Promise<{ url: string; error: string | null }> {
   try {
-    // Create Supabase client for storage operations
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    // Usar el cliente centralizado que ya tiene la configuración correcta
+    const supabase = createClient()
 
     // Generate unique file name
     const fileExt = file.name.split('.').pop()
@@ -18,7 +15,7 @@ export async function uploadProductImage(
 
     // Upload file to Supabase Storage
     const { data, error } = await supabase.storage
-      .from('upwear-images')
+      .from('product-images')
       .upload(fileName, file, {
         cacheControl: '3600',
         upsert: true
@@ -31,7 +28,7 @@ export async function uploadProductImage(
 
     // Get public URL
     const { data: { publicUrl } } = supabase.storage
-      .from('upwear-images')
+      .from('product-images')
       .getPublicUrl(fileName)
 
     return { url: publicUrl, error: null }
@@ -44,13 +41,10 @@ export async function uploadProductImage(
 
 export async function deleteProductImage(imagePath: string): Promise<{ success: boolean; error: string | null }> {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    const supabase = createClient()
 
     const { error } = await supabase.storage
-      .from('upwear-images')
+      .from('product-images')
       .remove([imagePath])
 
     if (error) {
@@ -66,13 +60,10 @@ export async function deleteProductImage(imagePath: string): Promise<{ success: 
 }
 
 export async function getProductImageUrl(imagePath: string): Promise<string> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  const supabase = createClient()
 
   const { data: { publicUrl } } = supabase.storage
-    .from('upwear-images')
+    .from('product-images')
     .getPublicUrl(imagePath)
 
   return publicUrl
