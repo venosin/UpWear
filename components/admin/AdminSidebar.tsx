@@ -17,7 +17,7 @@ import {
   Truck,
   Percent,
   BarChart3,
-  LogOut
+  ExternalLink
 } from 'lucide-react';
 
 /**
@@ -206,9 +206,8 @@ export function AdminSidebar() {
             )}
             {hasChildren && (
               <ChevronDown
-                className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''} ${
-                  active ? 'text-white' : 'text-[#8e9087]'
-                }`}
+                className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''} ${active ? 'text-white' : 'text-[#8e9087]'
+                  }`}
               />
             )}
           </div>
@@ -259,10 +258,12 @@ export function AdminSidebar() {
           <div className="p-4 border-t border-[#41423a]/20">
             <a
               href="/"
-              className="flex items-center space-x-3 text-[#b5b6ad] hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-[#41423a]/20"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center space-x-2 bg-[#41423a] text-white hover:bg-[#b5b6ad] hover:text-[#1a1b14] transition-all duration-200 py-3 px-4 rounded-lg font-medium shadow-sm group"
             >
-              <LogOut className="w-4 h-4" />
-              <span className="text-sm">Volver a Tienda</span>
+              <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span>Ver Tienda Pública</span>
             </a>
           </div>
         </div>
@@ -306,10 +307,12 @@ export function AdminSidebar() {
               <div className="p-4 border-t border-[#41423a]/20">
                 <a
                   href="/"
-                  className="flex items-center space-x-3 text-[#b5b6ad] hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-[#41423a]/20"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center space-x-2 bg-[#41423a] text-white hover:bg-[#b5b6ad] hover:text-[#1a1b14] transition-all duration-200 py-3 px-4 rounded-lg font-medium shadow-sm group"
                 >
-                  <LogOut className="w-4 h-4" />
-                  <span className="text-sm">Volver a Tienda</span>
+                  <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  <span>Ver Tienda Pública</span>
                 </a>
               </div>
             </div>

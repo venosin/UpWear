@@ -191,6 +191,36 @@ class ShopService {
   }
 
   /**
+   * Get all products
+   */
+  async getAllProducts(): Promise<Product[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from('products')
+        .select(`
+          id,
+          name,
+          slug,
+          price_sale,
+          price_original,
+          created_at,
+          images:product_images(url)
+        `)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error fetching all products:', error);
+        return [];
+      }
+
+      return this.mapProducts(data);
+    } catch (error) {
+      console.error('Error in getAllProducts:', error);
+      return [];
+    }
+  }
+
+  /**
    * Helper to map database results to Product interface
    */
   private mapProducts(data: any[]): Product[] {

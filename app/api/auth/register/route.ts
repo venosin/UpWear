@@ -68,28 +68,11 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Verificar que el email no exista ya en auth.users
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers({
-      filters: {
-        email: body.email
-      },
-      page: 1,
-      perPage: 1
-    });
-
-    if (existingUsers && existingUsers.users && existingUsers.users.length > 0) {
-      console.error('❌ Auth API: Email already registered');
-      return NextResponse.json({
-        success: false,
-        error: 'El email ya está registrado'
-      }, { status: 400 });
-    }
-
-    // Crear usuario en auth.users
+    // Crear usuario en auth.users directamente (Supabase maneja duplicados)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: body.email,
       password: body.password,
-      email_confirm: false, // No confirmar email automáticamente
+      email_confirm: false, // ⚠️ Requiere confirmación de email
       user_metadata: {
         full_name: body.full_name || null,
         phone: body.phone || null,
@@ -104,6 +87,15 @@ export async function POST(request: NextRequest) {
 
     if (authError || !authData.user) {
       console.error('❌ Auth API Error creating auth user:', authError);
+
+      // Si el error es de email duplicado, dar un mensaje más claro
+      if (authError?.message?.includes('already') || authError?.message?.includes('duplicate')) {
+        return NextResponse.json({
+          success: false,
+          error: 'El email ya está registrado'
+        }, { status: 400 });
+      }
+
       return NextResponse.json({
         success: false,
         error: authError?.message || 'Error al crear usuario'
@@ -119,7 +111,7 @@ export async function POST(request: NextRequest) {
         phone: body.phone || null,
         role: 'customer', // Todos los registros son clientes por defecto
         avatar_url: null,
-        email_verified: false, // Se verifica cuando el usuario confirma su email
+        email_verified: false, // Se verifica cuando confirman el email
         phone_verified: false,
         birth_date: body.birth_date || null,
         gender: body.gender || 'none',
@@ -147,20 +139,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Enviar email de verificación
-    const { error: emailError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'signup',
-      email: body.email,
-      options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify-email`
-      }
-    });
-
-    if (emailError) {
-      console.warn('⚠️ Auth API: Could not send verification email:', emailError);
-      // No fallamos el registro si no se puede enviar el email, solo lo registramos
-    }
-
     console.log('✅ Auth API: User registered successfully', {
       userId: authData.user.id,
       email: body.email
@@ -168,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Usuario registrado exitosamente. Revisa tu email para verificar tu cuenta.',
+      message: '¡Cuenta creada! Revisa tu email para confirmar tu cuenta antes de iniciar sesión.',
       user: {
         id: authData.user.id,
         email: authData.user.email,
@@ -177,7 +155,7 @@ export async function POST(request: NextRequest) {
       needsEmailVerification: true
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Auth API: Unexpected error during registration:', error);
     return NextResponse.json({
       success: false,
