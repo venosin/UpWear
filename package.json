@@ -37,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "^16.0.3",
     "postcss": "^8",
+    "supabase": "^2.65.6",
     "tailwindcss": "^4.1.17",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5"

@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: body.email,
       password: body.password,
-      email_confirm: false, // ⚠️ Requiere confirmación de email
+      email_confirm: false, // ⚠️ Requiere confirmación de email (SMTP Configurado)
       user_metadata: {
         full_name: body.full_name || null,
         phone: body.phone || null,
@@ -100,6 +100,22 @@ export async function POST(request: NextRequest) {
         success: false,
         error: authError?.message || 'Error al crear usuario'
       }, { status: 400 });
+    }
+
+    // 📧 ENVIAR CORREO DE CONFIRMACIÓN MANUALMENTE
+    // admin.createUser no envía correos, así que lo disparamos aquí.
+    const { error: emailError } = await supabaseAdmin.auth.resend({
+      type: 'signup',
+      email: body.email,
+      options: {
+        emailRedirectTo: `${request.nextUrl.origin}/auth/confirm`
+      }
+    });
+
+    if (emailError) {
+      console.error('⚠️ Auth API: Error sending confirmation email:', emailError);
+    } else {
+      console.log('✅ Auth API: Confirmation email sent successfully');
     }
 
     // Crear perfil en la tabla profiles

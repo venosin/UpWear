@@ -39,7 +39,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           </div>
 
           {/* Login Form */}
-          <LoginForm />
+          <LoginForm onSuccess={onClose} />
         </div>
       </div>
     </div>

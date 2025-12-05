@@ -4,8 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from './ui/Button';
 import { createClient } from '@/lib/supabase/client';
+import { showSuccessToast } from './ui/Toast';
 
-export function LoginForm() {
+interface LoginFormProps {
+  onSuccess?: () => void;
+}
+
+export function LoginForm({ onSuccess }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,19 +52,27 @@ export function LoginForm() {
             // Redirigir según el rol
             if (profile.role === 'admin' || profile.role === 'staff') {
               console.log('Redirecting to admin dashboard...');
+              showSuccessToast('¡Bienvenido al panel de administración!');
               router.push('/admin');
             } else {
-              console.log('Redirecting to protected page...');
-              router.push('/protected');
+              console.log('Redirecting to home...');
+              showSuccessToast('¡Bienvenido de nuevo!');
+              router.push('/');
             }
           } else {
-            console.log('Profile not found, redirecting to protected...');
-            router.push('/protected');
+            console.log('Profile not found, redirecting to home...');
+            showSuccessToast('¡Bienvenido de nuevo!');
+            router.push('/');
           }
+
+          if (onSuccess) onSuccess();
+
         } catch (error) {
           console.error('Error checking profile:', error);
-          console.log('Redirecting to protected due to error...');
-          router.push('/protected');
+          console.log('Redirecting to home due to error...');
+          showSuccessToast('¡Bienvenido de nuevo!');
+          router.push('/');
+          if (onSuccess) onSuccess();
         }
       }
     } catch (error: any) {

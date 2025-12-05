@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { Search, ShoppingCart, User, Heart, Menu, X, LogOut, UserCircle, Settings } from 'lucide-react';
 import { Button } from './Button';
+import { showSuccessToast } from './Toast';
 import { LoginModal } from '../login-modal';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -96,6 +97,7 @@ export function Navbar({ cartItems = 0 }: NavbarProps) {
         setUser(null);
         setProfile(null);
         setIsUserMenuOpen(false);
+        showSuccessToast('Sesión cerrada correctamente');
         router.push('/');
         router.refresh();
     };
